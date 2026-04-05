@@ -683,6 +683,13 @@ function toggleCard(id) {
   }
 }
 
+// Prevent tapping inputs/textareas inside a card from closing it
+document.addEventListener('click', function(e) {
+  if (e.target.matches('input, textarea, select, label')) {
+    e.stopPropagation();
+  }
+}, true);
+
 // ==================== LOG ====================
 async function logExercise(event, exerciseId, day) {
   event.stopPropagation();
