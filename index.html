@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IRON LOG — Workout Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --surface2: #1a1a1a;
+    --border: #2a2a2a;
+    --accent: #c8f060;
+    --accent2: #f0c040;
+    --text: #e8e8e8;
+    --muted: #666;
+    --red: #ff4444;
+    --day1: #c8f060;
+    --day2: #60c8f0;
+    --day3: #f060c8;
+    --day4: #f0c040;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 1000;
+    opacity: 0.5;
+  }
+
+  header {
+    padding: 2rem 2rem 1rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: flex-end;
+    gap: 2rem;
+    position: sticky;
+    top: 0;
+    background: rgba(10,10,10,0.95);
+    backdrop-filter: blur(20px);
+    z-index: 100;
+  }
+
+  .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 3rem;
+    letter-spacing: 0.05em;
+    line-height: 1;
+    color: var(--accent);
+    text-shadow: 0 0 40px rgba(200,240,96,0.3);
+  }
+
+  .logo span { color: var(--text); }
+
+  .header-sub {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    padding-bottom: 0.4rem;
+  }
+
+  .sync-status {
+    margin-left: auto;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding-bottom: 0.4rem;
+  }
+
+  .sync-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: background 0.3s;
+  }
+
+  .sync-dot.connected { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  .sync-dot.syncing { background: var(--accent2); animation: pulse 1s infinite; }
+  .sync-dot.error { background: var(--red); }
+
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+
+  nav {
+    display: flex;
+    gap: 0;
+    padding: 0 2rem;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+  }
+
+  nav button {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 1rem 1.5rem;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  nav button:hover { color: var(--text); }
+  nav button.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  main { padding: 2rem; max-width: 1100px; margin: 0 auto; }
+
+  .day-selector {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-bottom: 2.5rem;
+  }
+
+  .day-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 1.2rem 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .day-btn::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 3px; height: 100%;
+    background: var(--day-color);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .day-btn:hover::before, .day-btn.active::before { opacity: 1; }
+  .day-btn.active { border-color: var(--day-color); background: var(--surface2); }
+  .day-btn .day-label { font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem; color: var(--day-color); line-height: 1; }
+  .day-btn .day-focus { font-size: 0.7rem; color: var(--muted); font-family: 'DM Mono', monospace; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 0.3rem; }
+  .day-btn[data-day="1"] { --day-color: var(--day1); }
+  .day-btn[data-day="2"] { --day-color: var(--day2); }
+  .day-btn[data-day="3"] { --day-color: var(--day3); }
+  .day-btn[data-day="4"] { --day-color: var(--day4); }
+
+  .exercises-grid { display: flex; flex-direction: column; gap: 1px; }
+
+  .exercise-card {
+    background: var(--surface);
+    border-left: 3px solid transparent;
+    padding: 1.2rem 1.5rem;
+    transition: all 0.2s;
+    cursor: pointer;
+  }
+
+  .exercise-card:hover { background: var(--surface2); }
+  .exercise-card.expanded { border-color: var(--day-accent); }
+
+  .exercise-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .exercise-name { font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: 0.95rem; flex: 1; }
+  .exercise-meta { font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+
+  .last-logged {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--accent);
+    background: rgba(200,240,96,0.08);
+    padding: 0.2rem 0.6rem;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+
+  .last-logged.d2 { color: var(--day2); background: rgba(96,200,240,0.08); }
+  .last-logged.d3 { color: var(--day3); background: rgba(240,96,200,0.08); }
+  .last-logged.d4 { color: var(--day4); background: rgba(240,192,64,0.08); }
+
+  .log-form { display: none; margin-top: 1.2rem; padding-top: 1.2rem; border-top: 1px solid var(--border); }
+  .log-form.open { display: block; }
+
+  .log-inputs { display: flex; gap: 0.8rem; align-items: flex-end; flex-wrap: wrap; }
+
+  .input-group { display: flex; flex-direction: column; gap: 0.4rem; }
+
+  .input-group label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .input-group input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 1rem;
+    padding: 0.6rem 0.8rem;
+    width: 100px;
+    outline: none;
+    border-radius: 2px;
+    transition: border-color 0.2s;
+  }
+
+  .input-group input:focus { border-color: var(--accent); }
+  .input-group input.wide { width: 160px; }
+
+  .log-btn {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1rem;
+    letter-spacing: 0.08em;
+    padding: 0.65rem 1.5rem;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+
+  .log-btn:hover { background: #d8ff70; transform: translateY(-1px); }
+  .log-btn:active { transform: translateY(0); }
+  .log-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .history-mini { margin-top: 1rem; overflow-x: auto; }
+
+  .history-mini table { width: 100%; border-collapse: collapse; font-family: 'DM Mono', monospace; font-size: 0.72rem; }
+
+  .history-mini th {
+    color: var(--muted);
+    text-align: left;
+    padding: 0.3rem 0.8rem;
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .history-mini td { padding: 0.4rem 0.8rem; border-bottom: 1px solid rgba(42,42,42,0.5); color: var(--text); }
+  .history-mini tr:last-child td { border-bottom: none; }
+
+  .trend-up { color: #6fef6f; }
+  .trend-down { color: var(--red); }
+  .trend-same { color: var(--muted); }
+
+  .history-page { display: none; }
+  .history-page.active { display: block; }
+  .log-page { display: none; }
+  .log-page.active { display: block; }
+  .progress-page { display: none; }
+  .progress-page.active { display: block; }
+
+  .section-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem; letter-spacing: 0.05em; margin-bottom: 1.5rem; color: var(--text); }
+  .section-title span { color: var(--accent); }
+
+  .full-log { background: var(--surface); border: 1px solid var(--border); overflow: hidden; border-radius: 2px; overflow-x: auto; }
+
+  .full-log table { width: 100%; border-collapse: collapse; font-family: 'DM Mono', monospace; font-size: 0.8rem; min-width: 600px; }
+  .full-log thead { background: var(--surface2); }
+  .full-log th { padding: 0.8rem 1rem; text-align: left; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); border-bottom: 1px solid var(--border); }
+  .full-log td { padding: 0.7rem 1rem; border-bottom: 1px solid rgba(42,42,42,0.5); vertical-align: middle; }
+  .full-log tr:last-child td { border-bottom: none; }
+  .full-log tr:hover td { background: var(--surface2); }
+
+  .day-badge { display: inline-block; font-family: 'DM Mono', monospace; font-size: 0.65rem; padding: 0.15rem 0.5rem; border-radius: 2px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 500; }
+  .d1 { background: rgba(200,240,96,0.15); color: var(--day1); }
+  .d2 { background: rgba(96,200,240,0.15); color: var(--day2); }
+  .d3 { background: rgba(240,96,200,0.15); color: var(--day3); }
+  .d4 { background: rgba(240,192,64,0.15); color: var(--day4); }
+
+  .delete-btn { background: none; border: 1px solid var(--border); color: var(--muted); font-size: 0.7rem; padding: 0.2rem 0.5rem; cursor: pointer; border-radius: 2px; transition: all 0.15s; font-family: 'DM Mono', monospace; }
+  .delete-btn:hover { border-color: var(--red); color: var(--red); }
+
+  .empty-state { text-align: center; padding: 4rem 2rem; color: var(--muted); font-family: 'DM Mono', monospace; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; }
+  .empty-state .big { font-family: 'Bebas Neue', sans-serif; font-size: 3rem; color: var(--border); display: block; margin-bottom: 0.5rem; }
+
+  .stats-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--border); margin-bottom: 2rem; border: 1px solid var(--border); }
+  .stat-box { background: var(--surface); padding: 1.2rem 1.5rem; text-align: center; }
+  .stat-value { font-family: 'Bebas Neue', sans-serif; font-size: 2.2rem; color: var(--accent); line-height: 1; }
+  .stat-label { font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; margin-top: 0.3rem; }
+
+  .chart-container { background: var(--surface); border: 1px solid var(--border); padding: 1.5rem; margin-bottom: 1.5rem; border-radius: 2px; }
+  .chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+  .chart-title { font-family: 'DM Mono', monospace; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+
+  .chart-exercise-select { background: var(--bg); border: 1px solid var(--border); color: var(--text); font-family: 'DM Mono', monospace; font-size: 0.75rem; padding: 0.4rem 0.8rem; outline: none; cursor: pointer; border-radius: 2px; }
+
+  .svg-chart { width: 100%; height: 180px; overflow: visible; }
+
+  .toast { position: fixed; bottom: 2rem; right: 2rem; background: var(--accent); color: #000; font-family: 'DM Mono', monospace; font-size: 0.8rem; padding: 0.8rem 1.5rem; border-radius: 2px; transform: translateY(100px); opacity: 0; transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); z-index: 999; pointer-events: none; }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.error { background: var(--red); color: #fff; }
+
+  .notes-input { background: var(--bg); border: 1px solid var(--border); color: var(--text); font-family: 'DM Mono', monospace; font-size: 0.8rem; padding: 0.6rem 0.8rem; width: 220px; outline: none; border-radius: 2px; transition: border-color 0.2s; resize: none; height: 38px; }
+  .notes-input:focus { border-color: var(--accent); }
+
+  .filter-row { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+  .filter-btn { background: var(--surface); border: 1px solid var(--border); color: var(--muted); font-family: 'DM Mono', monospace; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; padding: 0.4rem 1rem; cursor: pointer; border-radius: 2px; transition: all 0.15s; }
+  .filter-btn:hover, .filter-btn.active { color: var(--text); border-color: var(--text); }
+  .filter-btn.f1.active { color: var(--day1); border-color: var(--day1); }
+  .filter-btn.f2.active { color: var(--day2); border-color: var(--day2); }
+  .filter-btn.f3.active { color: var(--day3); border-color: var(--day3); }
+  .filter-btn.f4.active { color: var(--day4); border-color: var(--day4); }
+
+  .loading-spinner {
+    display: inline-block;
+    width: 12px; height: 12px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    vertical-align: middle;
+    margin-right: 0.4rem;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 700px) {
+    .day-selector { grid-template-columns: repeat(2,1fr); }
+    .stats-bar { grid-template-columns: repeat(2,1fr); }
+    .log-inputs { gap: 0.6rem; }
+    .input-group input { width: 80px; }
+    header { padding: 1rem; gap: 1rem; flex-wrap: wrap; }
+    .logo { font-size: 2rem; }
+    main { padding: 1rem; }
+    nav button { padding: 0.8rem 1rem; }
+    .sync-status { font-size: 0.65rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">IRON<span>LOG</span></div>
+    <div class="header-sub">Workout Progress Tracker</div>
+  </div>
+  <div class="sync-status">
+    <div class="sync-dot" id="sync-dot"></div>
+    <span id="sync-label" style="color:var(--muted)">Connecting...</span>
+  </div>
+</header>
+
+<nav>
+  <button class="active" onclick="showPage('log')">Log Workout</button>
+  <button onclick="showPage('history')">History</button>
+  <button onclick="showPage('progress')">Progress</button>
+</nav>
+
+<main>
+
+  <div class="log-page active" id="page-log">
+    <div class="day-selector">
+      <button class="day-btn active" data-day="1" onclick="selectDay(1)">
+        <div class="day-label">Day 1</div>
+        <div class="day-focus">Squat · Dips · Pull-Ups</div>
+      </button>
+      <button class="day-btn" data-day="2" onclick="selectDay(2)">
+        <div class="day-label">Day 2</div>
+        <div class="day-focus">Legs · Press · Rows</div>
+      </button>
+      <button class="day-btn" data-day="3" onclick="selectDay(3)">
+        <div class="day-label">Day 3</div>
+        <div class="day-focus">Extensions · Core</div>
+      </button>
+      <button class="day-btn" data-day="4" onclick="selectDay(4)">
+        <div class="day-label">Day 4</div>
+        <div class="day-focus">Pallof · OHP · Rows</div>
+      </button>
+    </div>
+    <div class="exercises-grid" id="exercises-grid">
+      <div class="empty-state"><span class="loading-spinner"></span> Loading exercises...</div>
+    </div>
+  </div>
+
+  <div class="history-page" id="page-history">
+    <div class="stats-bar" id="stats-bar"></div>
+    <div class="section-title">All <span>Sessions</span></div>
+    <div class="filter-row">
+      <button class="filter-btn active" onclick="filterLog('all', this)">All Days</button>
+      <button class="filter-btn f1" onclick="filterLog(1, this)">Day 1</button>
+      <button class="filter-btn f2" onclick="filterLog(2, this)">Day 2</button>
+      <button class="filter-btn f3" onclick="filterLog(3, this)">Day 3</button>
+      <button class="filter-btn f4" onclick="filterLog(4, this)">Day 4</button>
+    </div>
+    <div class="full-log" id="full-log-table"></div>
+  </div>
+
+  <div class="progress-page" id="page-progress">
+    <div class="section-title">Progress <span>Charts</span></div>
+    <div class="chart-container">
+      <div class="chart-header">
+        <div class="chart-title">Weight Over Time</div>
+        <select class="chart-exercise-select" id="chart-select" onchange="renderChart()"></select>
+      </div>
+      <svg class="svg-chart" id="svg-chart" viewBox="0 0 800 180"></svg>
+    </div>
+    <div id="pr-list"></div>
+  </div>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ==================== SUPABASE CONFIG ====================
+const SUPABASE_URL = 'https://rohklvbzpkdlkzehinsz.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJvaGtsdmJ6cGtkbGt6ZWhpbnN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzOTU3MTMsImV4cCI6MjA5MDk3MTcxM30.norsa6CDGsEx2pvwtKEZUSTNPdn2hN8l6XktQFN_MmY';
+
+const headers = {
+  'apikey': SUPABASE_KEY,
+  'Authorization': `Bearer ${SUPABASE_KEY}`,
+  'Content-Type': 'application/json',
+  'Prefer': 'return=representation'
+};
+
+// In-memory cache
+let logsCache = [];
+let cacheLoaded = false;
+
+async function dbFetch(path, options = {}) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers, ...options });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err);
+  }
+  const text = await res.text();
+  return text ? JSON.parse(text) : [];
+}
+
+async function loadAllLogs() {
+  setSyncStatus('syncing', 'Syncing...');
+  try {
+    const data = await dbFetch('workout_logs?order=date.desc&limit=1000');
+    logsCache = data;
+    cacheLoaded = true;
+    setSyncStatus('connected', 'Synced');
+    return data;
+  } catch(e) {
+    setSyncStatus('error', 'Offline');
+    showToast('Could not connect to database', true);
+    return [];
+  }
+}
+
+async function insertLog(entry) {
+  const data = await dbFetch('workout_logs', {
+    method: 'POST',
+    body: JSON.stringify(entry)
+  });
+  // prepend to cache
+  logsCache.unshift(data[0]);
+  return data[0];
+}
+
+async function deleteLogDB(id) {
+  await dbFetch(`workout_logs?id=eq.${id}`, { method: 'DELETE' });
+  logsCache = logsCache.filter(l => l.id !== id);
+}
+
+function setSyncStatus(state, label) {
+  const dot = document.getElementById('sync-dot');
+  const lbl = document.getElementById('sync-label');
+  dot.className = 'sync-dot ' + state;
+  lbl.textContent = label;
+  lbl.style.color = state === 'connected' ? 'var(--accent)' : state === 'error' ? 'var(--red)' : 'var(--accent2)';
+}
+
+// ==================== WORKOUT DATA ====================
+const WORKOUT_DATA = {
+  1: {
+    color: '#c8f060',
+    exercises: [
+      { id: 'e1_1', name: 'Zercher Squats', default: '5kg/side', reps: 10 },
+      { id: 'e1_2', name: 'Weighted Dips', default: '14kg assisted', reps: 8 },
+      { id: 'e1_3', name: 'Weighted Pull-Ups', default: '14kg assisted', reps: 4 },
+      { id: 'e1_4', name: 'Dumbbell Lateral Raises', default: '10kg', reps: 7 },
+      { id: 'e1_5', name: 'Incline Dumbbell Curls', default: '10kg', reps: 10, note: 'bench slightly reclined, elbows behind torso' },
+      { id: 'e1_6', name: 'Single-Leg Triceps Cable Extension', default: '16.3kg', reps: 14, note: 'low-to-high cable, arm moving upward behind' },
+      { id: 'e1_7', name: 'Weighted Lower Back Extension', default: '', reps: null },
+    ]
+  },
+  2: {
+    color: '#60c8f0',
+    exercises: [
+      { id: 'e2_1', name: 'Leg Curls', default: '36kg', reps: 8 },
+      { id: 'e2_2', name: 'Incline Dumbbell Press', default: '', reps: null },
+      { id: 'e2_3', name: 'T-Bar Rows', default: '', reps: null, note: 'upper back focus' },
+      { id: 'e2_4', name: 'T-Bar Rear Delt Rows', default: '', reps: null, note: 'chest-supported, elbows flared' },
+      { id: 'e2_5', name: 'T-Bar Shrugs', default: '', reps: null, note: 'for traps' },
+      { id: 'e2_6', name: 'Standing Dumbbell Curls', default: '', reps: null, note: 'elbows kept close to torso' },
+      { id: 'e2_7', name: 'Single-Arm Cable Triceps Pushdowns', default: '', reps: null },
+      { id: 'e2_8', name: 'Reverse Curls', default: '', reps: null, note: 'EZ bar or barbell' },
+    ]
+  },
+  3: {
+    color: '#f060c8',
+    exercises: [
+      { id: 'e3_1', name: 'Leg Extensions', default: '45kg', reps: 12 },
+      { id: 'e3_2', name: 'Weighted Dips', default: '5kg', reps: 4 },
+      { id: 'e3_3', name: 'Weighted Pull-Ups', default: '14kg assist', reps: 4 },
+      { id: 'e3_4', name: 'Cable Lateral Raises', default: '8.8kg', reps: 7, note: 'single-arm, pulley at rib height for stretch' },
+      { id: 'e3_5', name: 'Seated Wrist Curls', default: '9kg', reps: 8, note: 'forearm flexors' },
+      { id: 'e3_6', name: 'Seated Reverse Wrist Curls', default: '8kg', reps: 6, note: 'forearm extensors' },
+      { id: 'e3_7', name: 'Cable Crunches', default: '10kg', reps: 13, note: 'lat pulldown machine' },
+      { id: 'e3_8', name: 'Weighted Obliques', default: '', reps: null, note: 'lower back extension machine' },
+    ]
+  },
+  4: {
+    color: '#f0c040',
+    exercises: [
+      { id: 'e4_1', name: 'Pallof Press Holds', default: '10.2kg', reps: 8 },
+      { id: 'e4_2', name: 'Half-Kneeling Pallof Press', default: '10.2kg', reps: 5, note: 'anti-rotation press in lunge stance' },
+      { id: 'e4_3', name: 'Incline Dumbbell Press', default: '10kg', reps: 11 },
+      { id: 'e4_4', name: 'T-Bar Rows', default: '43kg', reps: 6, note: 'upper back focus' },
+      { id: 'e4_5', name: 'T-Bar Shrugs', default: '36.6kg', reps: 8, note: 'drop set after rows' },
+      { id: 'e4_6', name: 'Rear Delt Fly', default: '52kg', reps: 7, note: 'machine or cable' },
+      { id: 'e4_7', name: 'Standing Barbell Overhead Press', default: '11.5kg bar', reps: 13, note: 'front delt focus' },
+      { id: 'e4_8', name: 'Jefferson Curl', default: '', reps: null },
+    ]
+  }
+};
+
+let currentDay = 1;
+let currentFilter = 'all';
+
+function getLastLog(exerciseId) {
+  return logsCache.filter(l => l.exercise_id === exerciseId)[0] || null;
+}
+
+function getLogsForExercise(exerciseId) {
+  return [...logsCache.filter(l => l.exercise_id === exerciseId)].sort((a,b) => new Date(a.date) - new Date(b.date));
+}
+
+// ==================== PAGES ====================
+function showPage(page) {
+  document.querySelectorAll('nav button').forEach((b,i) => {
+    b.classList.toggle('active', ['log','history','progress'][i] === page);
+  });
+  ['log','history','progress'].forEach(p => {
+    const el = document.getElementById('page-'+p);
+    el.style.display = p === page ? 'block' : 'none';
+    el.classList.toggle('active', p === page);
+  });
+  if (page === 'history') renderHistory();
+  if (page === 'progress') renderProgress();
+}
+
+['log','history','progress'].forEach(p => {
+  const el = document.getElementById('page-'+p);
+  el.style.display = el.classList.contains('active') ? 'block' : 'none';
+});
+
+// ==================== DAY ====================
+function selectDay(day) {
+  currentDay = day;
+  document.querySelectorAll('.day-btn').forEach(b => b.classList.toggle('active', +b.dataset.day === day));
+  renderExercises();
+}
+
+// ==================== RENDER EXERCISES ====================
+function renderExercises() {
+  const day = WORKOUT_DATA[currentDay];
+  const color = day.color;
+  const grid = document.getElementById('exercises-grid');
+
+  grid.innerHTML = day.exercises.map(ex => {
+    const last = getLastLog(ex.id);
+    const lastHtml = last
+      ? `<span class="last-logged d${currentDay}">${last.weight || '—'} × ${last.reps || '—'}</span>`
+      : `<span class="exercise-meta">${ex.default || 'No logs yet'}</span>`;
+
+    return `
+    <div class="exercise-card" id="card-${ex.id}" style="--day-accent:${color}" onclick="toggleCard('${ex.id}')">
+      <div class="exercise-header">
+        <div>
+          <div class="exercise-name">${ex.name}</div>
+          ${ex.note ? `<div class="exercise-meta" style="margin-top:0.2rem">${ex.note}</div>` : ''}
+        </div>
+        <div style="display:flex;align-items:center;gap:0.8rem">
+          ${lastHtml}
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style="color:var(--muted);transition:transform 0.2s;flex-shrink:0" id="arrow-${ex.id}">
+            <path d="M3 5L7 9L11 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+      </div>
+      <div class="log-form" id="form-${ex.id}">
+        ${renderHistoryMini(ex.id)}
+        <div class="log-inputs" style="margin-top:1rem">
+          <div class="input-group">
+            <label>Weight / Load</label>
+            <input type="text" id="inp-weight-${ex.id}" placeholder="${ex.default || 'e.g. 20kg'}" class="wide">
+          </div>
+          <div class="input-group">
+            <label>Reps</label>
+            <input type="number" id="inp-reps-${ex.id}" placeholder="${ex.reps || '—'}" min="1">
+          </div>
+          <div class="input-group">
+            <label>Sets</label>
+            <input type="number" id="inp-sets-${ex.id}" placeholder="1" min="1" value="1">
+          </div>
+          <div class="input-group">
+            <label>Notes</label>
+            <textarea class="notes-input" id="inp-notes-${ex.id}" placeholder="optional..."></textarea>
+          </div>
+          <button class="log-btn" id="logbtn-${ex.id}" onclick="logExercise(event, '${ex.id}', ${currentDay})">LOG IT</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderHistoryMini(exerciseId) {
+  const logs = getLogsForExercise(exerciseId).slice(-5).reverse();
+  if (!logs.length) return '<div class="exercise-meta" style="margin-top:0.5rem;font-family:DM Mono,monospace;font-size:0.72rem;color:var(--muted)">No previous logs — be the first to set a record!</div>';
+
+  const rows = logs.map((l, i) => {
+    const prev = logs[i+1];
+    let trend = '';
+    if (prev && l.weight && prev.weight) {
+      const curr = parseFloat(l.weight);
+      const p = parseFloat(prev.weight);
+      if (!isNaN(curr) && !isNaN(p)) {
+        trend = curr > p ? '<span class="trend-up">↑</span>' : curr < p ? '<span class="trend-down">↓</span>' : '<span class="trend-same">→</span>';
+      }
+    }
+    return `<tr>
+      <td>${formatDate(l.date)}</td>
+      <td><strong>${l.weight || '—'}</strong> ${trend}</td>
+      <td>${l.reps || '—'} reps</td>
+      <td>${l.sets || 1} sets</td>
+      <td style="color:var(--muted);font-size:0.68rem;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.notes || ''}</td>
+    </tr>`;
+  }).join('');
+
+  return `<div class="history-mini">
+    <table>
+      <thead><tr><th>Date</th><th>Weight</th><th>Reps</th><th>Sets</th><th>Notes</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
+function toggleCard(id) {
+  const form = document.getElementById('form-'+id);
+  const card = document.getElementById('card-'+id);
+  const arrow = document.getElementById('arrow-'+id);
+  const isOpen = form.classList.contains('open');
+  document.querySelectorAll('.log-form.open').forEach(f => f.classList.remove('open'));
+  document.querySelectorAll('.exercise-card.expanded').forEach(c => c.classList.remove('expanded'));
+  document.querySelectorAll('svg[id^="arrow-"]').forEach(a => a.style.transform = '');
+  if (!isOpen) {
+    form.classList.add('open');
+    card.classList.add('expanded');
+    arrow.style.transform = 'rotate(180deg)';
+  }
+}
+
+// ==================== LOG ====================
+async function logExercise(event, exerciseId, day) {
+  event.stopPropagation();
+  const btn = document.getElementById('logbtn-'+exerciseId);
+  const weight = document.getElementById('inp-weight-'+exerciseId).value.trim();
+  const reps = document.getElementById('inp-reps-'+exerciseId).value.trim();
+  const sets = document.getElementById('inp-sets-'+exerciseId).value.trim() || '1';
+  const notes = document.getElementById('inp-notes-'+exerciseId).value.trim();
+  const ex = WORKOUT_DATA[day].exercises.find(e => e.id === exerciseId);
+
+  const entry = {
+    exercise_id: exerciseId,
+    exercise_name: ex.name,
+    day,
+    weight: weight || ex.default || '',
+    reps: reps || String(ex.reps || ''),
+    sets,
+    notes,
+    date: new Date().toISOString()
+  };
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loading-spinner"></span>';
+  setSyncStatus('syncing', 'Saving...');
+
+  try {
+    await insertLog(entry);
+    setSyncStatus('connected', 'Saved ✓');
+    showToast(`Logged: ${ex.name}`);
+    renderExercises();
+    setTimeout(() => toggleCard(exerciseId), 50);
+  } catch(e) {
+    setSyncStatus('error', 'Save failed');
+    showToast('Failed to save. Check connection.', true);
+    btn.disabled = false;
+    btn.textContent = 'LOG IT';
+  }
+}
+
+// ==================== HISTORY ====================
+function renderHistory() {
+  renderStats();
+  renderLogTable();
+}
+
+function renderStats() {
+  const logs = logsCache;
+  const sessions = [...new Set(logs.map(l => l.date.split('T')[0]))].length;
+  const total = logs.length;
+  const thisWeek = logs.filter(l => {
+    const diff = (new Date() - new Date(l.date)) / (1000*60*60*24);
+    return diff <= 7;
+  }).length;
+  const days = [...new Set(logs.map(l => l.day))].length;
+
+  document.getElementById('stats-bar').innerHTML = `
+    <div class="stat-box"><div class="stat-value">${total}</div><div class="stat-label">Total Sets Logged</div></div>
+    <div class="stat-box"><div class="stat-value">${sessions}</div><div class="stat-label">Training Days</div></div>
+    <div class="stat-box"><div class="stat-value">${thisWeek}</div><div class="stat-label">Sets This Week</div></div>
+    <div class="stat-box"><div class="stat-value">${days}</div><div class="stat-label">Days Trained</div></div>
+  `;
+}
+
+function filterLog(filter, btn) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderLogTable();
+}
+
+function renderLogTable() {
+  let logs = [...logsCache];
+  if (currentFilter !== 'all') logs = logs.filter(l => l.day == currentFilter);
+
+  const container = document.getElementById('full-log-table');
+  if (!logs.length) {
+    container.innerHTML = `<div class="empty-state"><span class="big">EMPTY</span>No logged sessions yet. Start on the Log tab.</div>`;
+    return;
+  }
+
+  container.innerHTML = `<table>
+    <thead><tr><th>Date</th><th>Day</th><th>Exercise</th><th>Weight</th><th>Reps</th><th>Sets</th><th>Notes</th><th></th></tr></thead>
+    <tbody>
+      ${logs.map(l => `
+        <tr>
+          <td style="white-space:nowrap">${formatDateTime(l.date)}</td>
+          <td><span class="day-badge d${l.day}">Day ${l.day}</span></td>
+          <td><strong>${l.exercise_name}</strong></td>
+          <td style="font-family:'DM Mono',monospace">${l.weight || '—'}</td>
+          <td style="font-family:'DM Mono',monospace">${l.reps || '—'}</td>
+          <td style="font-family:'DM Mono',monospace">${l.sets || 1}</td>
+          <td style="color:var(--muted);font-size:0.75rem;max-width:150px">${l.notes || ''}</td>
+          <td><button class="delete-btn" onclick="deleteLog('${l.id}')">DEL</button></td>
+        </tr>`).join('')}
+    </tbody>
+  </table>`;
+}
+
+async function deleteLog(id) {
+  if (!confirm('Delete this entry?')) return;
+  setSyncStatus('syncing', 'Deleting...');
+  try {
+    await deleteLogDB(id);
+    setSyncStatus('connected', 'Deleted ✓');
+    renderHistory();
+    renderExercises();
+    showToast('Entry deleted');
+  } catch(e) {
+    setSyncStatus('error', 'Delete failed');
+    showToast('Failed to delete', true);
+  }
+}
+
+// ==================== PROGRESS ====================
+function renderProgress() {
+  const select = document.getElementById('chart-select');
+  const allExercises = Object.values(WORKOUT_DATA).flatMap(d => d.exercises);
+  const loggedIds = [...new Set(logsCache.map(l => l.exercise_id))];
+
+  select.innerHTML = loggedIds.length
+    ? loggedIds.map(id => {
+        const ex = allExercises.find(e => e.id === id);
+        return ex ? `<option value="${id}">${ex.name}</option>` : '';
+      }).join('')
+    : '<option>No data yet</option>';
+
+  renderChart();
+  renderPRs();
+}
+
+function renderChart() {
+  const select = document.getElementById('chart-select');
+  const exerciseId = select.value;
+  const svg = document.getElementById('svg-chart');
+  svg.innerHTML = '';
+
+  if (!exerciseId) return;
+
+  const logs = getLogsForExercise(exerciseId);
+  const weights = logs.map(l => parseFloat(l.weight)).filter(w => !isNaN(w));
+
+  if (weights.length < 2) {
+    svg.innerHTML = `<text x="400" y="90" text-anchor="middle" fill="#444" font-family="DM Mono,monospace" font-size="14">Need at least 2 sessions to plot</text>`;
+    return;
+  }
+
+  const W = 800, H = 180, PAD = 40;
+  const minW = Math.min(...weights) * 0.9;
+  const maxW = Math.max(...weights) * 1.1;
+  const n = weights.length;
+
+  const points = weights.map((w, i) => ({
+    x: PAD + (i / (n-1)) * (W - PAD*2),
+    y: H - PAD - ((w - minW) / (maxW - minW)) * (H - PAD*2)
+  }));
+
+  for (let i = 0; i <= 4; i++) {
+    const y = PAD + (i/4)*(H-PAD*2);
+    const val = (maxW - (i/4)*(maxW-minW)).toFixed(1);
+    svg.innerHTML += `<line x1="${PAD}" y1="${y}" x2="${W-PAD}" y2="${y}" stroke="#222" stroke-width="1"/>
+    <text x="${PAD-4}" y="${y+4}" text-anchor="end" fill="#555" font-family="DM Mono,monospace" font-size="10">${val}</text>`;
+  }
+
+  const step = Math.max(1, Math.floor(n/5));
+  logs.filter((_,i) => i % step === 0 || i === n-1).forEach((l,_,arr) => {
+    const idx = logs.indexOf(l);
+    const x = PAD + (idx/(n-1))*(W-PAD*2);
+    svg.innerHTML += `<text x="${x}" y="${H-PAD+18}" text-anchor="middle" fill="#555" font-family="DM Mono,monospace" font-size="10">${formatDate(l.date)}</text>`;
+  });
+
+  const pathArea = `M ${points[0].x},${H-PAD} ` + points.map(p => `L ${p.x},${p.y}`).join(' ') + ` L ${points[n-1].x},${H-PAD} Z`;
+  svg.innerHTML += `<defs><linearGradient id="grad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#c8f060" stop-opacity="0.3"/><stop offset="100%" stop-color="#c8f060" stop-opacity="0"/></linearGradient></defs>
+  <path d="${pathArea}" fill="url(#grad)"/>`;
+
+  const pathLine = 'M ' + points.map(p => `${p.x},${p.y}`).join(' L ');
+  svg.innerHTML += `<path d="${pathLine}" fill="none" stroke="#c8f060" stroke-width="2"/>`;
+
+  points.forEach((p, i) => {
+    svg.innerHTML += `<circle cx="${p.x}" cy="${p.y}" r="4" fill="#c8f060"><title>${weights[i]}kg</title></circle>`;
+  });
+}
+
+function renderPRs() {
+  const allExercises = Object.values(WORKOUT_DATA).flatMap(d => d.exercises);
+  const grouped = {};
+  logsCache.forEach(l => {
+    if (!grouped[l.exercise_id]) grouped[l.exercise_id] = [];
+    grouped[l.exercise_id].push(l);
+  });
+
+  const prHTML = Object.entries(grouped).map(([id, entries]) => {
+    const ex = allExercises.find(e => e.id === id);
+    if (!ex) return '';
+    const weights = entries.map(l => parseFloat(l.weight)).filter(w => !isNaN(w));
+    if (!weights.length) return '';
+    const pr = Math.max(...weights);
+    const prEntry = entries.find(l => parseFloat(l.weight) === pr);
+    return `<div style="background:var(--surface);border:1px solid var(--border);padding:1rem 1.5rem;display:flex;justify-content:space-between;align-items:center;margin-bottom:1px">
+      <div>
+        <div style="font-weight:600;margin-bottom:0.2rem">${ex.name}</div>
+        <div style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--muted)">${entries.length} sessions logged</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:1.8rem;color:var(--accent);line-height:1">${pr}kg PR</div>
+        <div style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--muted)">${formatDate(prEntry?.date || '')}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('pr-list').innerHTML = prHTML
+    ? `<div class="section-title" style="margin-top:2rem">Personal <span>Records</span></div>${prHTML}`
+    : '';
+}
+
+// ==================== UTILS ====================
+function formatDate(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleDateString('en-GB', { day:'2-digit', month:'short' });
+}
+
+function formatDateTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'2-digit' }) + ' ' +
+    d.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+}
+
+function showToast(msg, isError = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast' + (isError ? ' error' : '');
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ==================== INIT ====================
+(async () => {
+  await loadAllLogs();
+  renderExercises();
+})();
+</script>
+</body>
+</html>
